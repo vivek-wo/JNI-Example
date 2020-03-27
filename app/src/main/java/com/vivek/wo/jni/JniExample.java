@@ -12,5 +12,9 @@ public class JniExample {
 
     public native void onJniCall(String arg1, int arg2, byte[] arg3, OnJNICallback callback);
 
-    public native void onJniExecute();
+    public native String onJniExecute();
+
+    public native void onJniDynamicCall(String arg1, int arg2, byte[] arg3, OnJNICallback callback);
+
+    public native int onJniDynamicExecute();
 }
