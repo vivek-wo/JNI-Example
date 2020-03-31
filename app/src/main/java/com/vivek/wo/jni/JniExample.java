@@ -7,7 +7,7 @@ public class JniExample {
     }
 
     public interface OnJNICallback {
-        void onCallback(int code, String message);
+        void onCallback(int result, String message);
     }
 
     public native void onJniCall(String arg1, int arg2, byte[] arg3, OnJNICallback callback);

@@ -11,6 +11,45 @@ extern "C" {
 #define TAG "_JNI_TAG_"
 #define _jni_log_(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__);
 
+JavaVM *g_VM;
+jobject g_jcallback;
+
+static void callback(jint result, char *message) {
+    JNIEnv *env;
+    //获取当前native线程是否有没有被附加到jvm环境中
+    int attach_result = g_VM->GetEnv((void **) &env, JNI_VERSION_1_4);
+    if (attach_result == JNI_EDETACHED) {
+        //如果没有， 主动附加到jvm环境中，获取到env
+        if (g_VM->AttachCurrentThread(&env, NULL) != JNI_OK) {
+            return;
+        }
+    }
+
+    //通过强转后的jcallback 获取到要回调的类
+    jclass javaClass = env->GetObjectClass(g_jcallback);
+    if (!javaClass) {
+        _jni_log_("class not found.\n");
+        goto END;
+    }
+    //获取要回调的方法ID
+    jmethodID javaCallbackId = env->GetMethodID(javaClass, "onCallback", "(ILjava/lang/String;)V");
+    if (javaCallbackId == NULL) {
+        _jni_log_("onCallback method not found.\n");
+        return;
+    }
+    jstring jmessage = env->NewStringUTF(message);
+    //执行回调
+    env->CallVoidMethod(g_jcallback, javaCallbackId, result, jmessage);
+    //释放全局引用
+    env->DeleteLocalRef(jmessage);
+END:
+    //释放当前线程
+    if (attach_result== JNI_EDETACHED) {
+        g_VM->DetachCurrentThread();
+    }
+}
+
+
 /*
  * Class:     com_vivek_wo_jni_JniExample
  * Method:    onJniCall
@@ -40,6 +79,15 @@ JNIEXPORT jstring JNICALL Java_com_vivek_wo_jni_JniExample_onJniExecute
 static void
 android_onJniDynamicCall(JNIEnv *env, jobject thiz, jstring jarg1, jint jarg2, jbyteArray jarg3,
                          jobject jcallback) {
+    //获取JavaVM
+//    env->GetJavaVM(&g_VM);
+    if(NULL != g_jcallback){
+        env->DeleteGlobalRef(g_jcallback);
+        g_jcallback = NULL;
+    }
+    //全局引用
+    g_jcallback = env->NewGlobalRef(jcallback);
+
     const char *arg1 = env->GetStringUTFChars(jarg1, NULL);
     _jni_log_("android_onJniDynamicCall Method arg1: %s, arg2: %d", arg1, jarg2);
     env->ReleaseStringUTFChars(jarg1, arg1);
